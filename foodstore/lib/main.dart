@@ -1,35 +1,42 @@
-import 'dart:ffi';
+import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
+
+import 'package:http/http.dart' as http;
 
 import 'dart:math'; // 使用亂數時要引用這個
-
-import 'package:flutter/material.dart';
-
-import 'dart:io';
-
-import 'dart:async'; //要使用 Timer 要用這個
-
-import 'package:http/http.dart' as http; // http LIB
-
-import 'package:path_provider/path_provider.dart'; // path_provider LIB
 
 void main() {
   runApp(MyApp());
 }
 
-class MyApp extends StatefulWidget {
+class MyApp extends StatelessWidget {
   @override
-  State<MyApp> createState() => _MyAppState();
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      home: Scaffold(
+        appBar: AppBar(title: Text("圖片動畫示範")),
+        body: ImageSwitcher(),
+      ),
+    );
+  }
 }
 
-class _MyAppState extends State<MyApp> {
-  int _counterTimer1 = 0;
-  Timer? _timer1;
+class ImageSwitcher extends StatefulWidget {
+  @override
+  _ImageSwitcherState createState() => _ImageSwitcherState();
+}
 
-  int oImgIndex = 0;
-  int ooImgIndex = 0;
-  int oooImgIndex = 0;
+class _ImageSwitcherState extends State<ImageSwitcher> {
+  bool _showFirstImage = true;
+  double downloadProgress = 0.0; // 下載進度
 
-  List<Image> gitHubImg = [];
+  bool isLoading = true; // 用來判斷是否正在加載
+
+  Image? _currentImg;
+
+  List<Image> _listImg = [];
+  int currentImageIndex = 0;
+
   List<String> imageUrls = [
     'https://github.com/airoyjones0429/foodmenu/blob/main/fruitimg/fruit01.png?raw=true',
     'https://github.com/airoyjones0429/foodmenu/blob/main/fruitimg/fruit02.png?raw=true',
@@ -45,244 +52,137 @@ class _MyAppState extends State<MyApp> {
     'https://github.com/airoyjones0429/foodmenu/blob/main/fruitimg/fruit12.png?raw=true',
   ];
 
-  static int _keyCounter = 0; // 靜態變數來追踪鍵值
-
-  int _getNextKey() {
-    return _keyCounter++; // 返回當前鍵值，然後遞增
-  }
-
   @override
-  void dispose() {
-    _timer1?.cancel(); //取消計時器
-    super.dispose();
+  void initState() {
+    super.initState();
+
+    /// 設定載入一筆圖片的設定，如果一筆設定成功，就可以設定多筆
+    // _currentImg = Image.network(
+    //   imageUrls[0],
+    //   loadingBuilder: (context, child, loadingProgress) {
+    //     return loadingProgress == null ? child : LinearProgressIndicator();
+    //   },
+    //   key: ValueKey<int>(1),
+    // );
+
+    /// 載入圖片Widget 的設定，但在執行前，並不會從網路上下載下來
+    // for (int uIndex = 0; uIndex < imageUrls.length; uIndex++) {
+    //   Image tempImg = Image.network(
+    //     imageUrls[uIndex],
+    //     loadingBuilder: (context, child, loadingProgress) {
+    //       return loadingProgress == null ? child : LinearProgressIndicator();
+    //     },
+    //     key: ValueKey<int>(uIndex),
+    //   );
+
+    //   _listImg.add(tempImg);
+    // }
   }
 
-  void _executeTask() {
-    Random random = Random();
-    oImgIndex = random.nextInt(imageUrls.length); // 生成隨機索引
-    ooImgIndex = random.nextInt(imageUrls.length); // 生成隨機索引
-    oooImgIndex = random.nextInt(imageUrls.length); // 生成隨機索引
-    _counterTimer1++;
-
-    //計時器自動停止
-    print(_counterTimer1);
-    if (_counterTimer1 >= 50) {
-      _counterTimer1 = 0;
-      _timer1!.cancel();
-    }
-
-    setState(() {}); //刷新畫面
-  }
-
-  //載入圖片到清單中
-  Future<void> preloadImages() async {
-    for (String url in imageUrls) {
-      final image = Image.network(
-        url,
-        fit: BoxFit.cover,
-      );
-      gitHubImg.add(image);
-
-      // 這裡可以使用 `await precacheImage` 來確保圖片被緩存
-      await precacheImage(NetworkImage(url), context);
-    }
-
+  void _toggleImage() {
     setState(() {
-      //載入資料後，用來刷新畫面
+      currentImageIndex += 1;
+      currentImageIndex %= _listImg.length; // 確保不會超出範圍
+      _currentImg = _listImg[currentImageIndex]; // 確保這裡的 _currentImg 是非空的
+      print(_listImg[currentImageIndex].key);
     });
   }
 
   @override
-  Widget build(BuildContext context) {
-    print('Test');
-    return MaterialApp(
-      home: Scaffold(
-        appBar: AppBar(
-          title: Text("顯示 Git Hub 上的圖片"),
-        ),
-        body: Center(
-          child: Column(
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  gitHubImg.isEmpty ? Text('下載資料中') : gitHubImg[oImgIndex],
-                  gitHubImg.isEmpty ? Text('下載資料中') : gitHubImg[ooImgIndex],
-                  gitHubImg.isEmpty ? Text('下載資料中') : gitHubImg[oooImgIndex],
-                ],
-              ),
-              SizedBox(
-                height: 20,
-              ),
-              ElevatedButton(
-                  onPressed: () {
-                    // 每 2 秒執行一次 _executeTask 方法
-                    _timer1 =
-                        Timer.periodic(Duration(milliseconds: 250), (timer) {
-                      _executeTask();
-                    });
-                  },
-                  child: Text('隨機抽一張卡')),
-              ElevatedButton(
-                  onPressed: () {
-                    preloadImages();
-                  },
-                  child: Text('載入圖片資料')),
-              Expanded(
-                child: MyFruits(
-                  gitHubImg: gitHubImg,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    preloadImages();
   }
-}
 
-class MyFruits extends StatefulWidget {
-  final List<Image>? gitHubImg;
+  ///載入圖片到清單中
+  ///這是非同步函數，當沒有使用 precacheImage 時
+  ///圖片切換時，會發生延遲，有很多方式處理
+  ///這裡練習使用 precacheImage
+  /// async  await 是搭配使用的，不一定要有 await，但效果不一樣
+  Future<void> preloadImages() async {
+    for (int i = 0; i < imageUrls.length; i++) {
+      final image = Image.network(
+        imageUrls[i],
+        key: ValueKey<int>(i),
+        fit: BoxFit.cover,
+      );
+      _listImg.add(image);
 
-  const MyFruits({
-    super.key,
-    this.gitHubImg,
-  });
+      // 這裡可以使用 `await precacheImage` 來確保圖片被緩存
+      await precacheImage(NetworkImage(imageUrls[i]), context);
 
-  @override
-  State<MyFruits> createState() => _MyFruitsState();
-}
-
-class _MyFruitsState extends State<MyFruits> {
-  int oImgIndex = 0;
-  int ooImgIndex = 0;
-  int oooImgIndex = 0;
-
-  List<List<int>> fruitDish = [
-    [0, 0, 0],
-    [0, 0, 0],
-    [0, 0, 0]
-  ];
-
-  Timer? _timer1;
-  int _counterTimer1 = 0;
-
-  void _executeTask() {
-    Random random = Random();
-    int indexSeed = widget.gitHubImg!.length;
+      // 更新下載進度
+      setState(() {
+        downloadProgress = (i + 1) / imageUrls.length;
+      });
+    }
 
     setState(() {
-      oImgIndex = random.nextInt(indexSeed); // 生成隨機索引
-      ooImgIndex = random.nextInt(indexSeed); // 生成隨機索引
-      oooImgIndex = random.nextInt(indexSeed); // 生成隨機索引
-      fruitDish[0][0] = random.nextInt(indexSeed); // 生成隨機索引
-      fruitDish[0][1] = random.nextInt(indexSeed); // 生成隨機索引
-      fruitDish[0][2] = random.nextInt(indexSeed); // 生成隨機索引
-      fruitDish[1][0] = random.nextInt(indexSeed); // 生成隨機索引
-      fruitDish[1][1] = random.nextInt(indexSeed); // 生成隨機索引
-      fruitDish[1][2] = random.nextInt(indexSeed); // 生成隨機索引
-      fruitDish[2][0] = random.nextInt(indexSeed); // 生成隨機索引
-      fruitDish[2][1] = random.nextInt(indexSeed); // 生成隨機索引
-      fruitDish[2][2] = random.nextInt(indexSeed); // 生成隨機索引
-
-      _counterTimer1++;
-    }); //刷新畫面
-
-    //計時器自動停止
-    print(_counterTimer1);
-    if (_counterTimer1 >= 50) {
-      _counterTimer1 = 0;
-      _timer1!.cancel();
-    }
+      isLoading = false; // 下載完成，不顯示進度條
+      _currentImg = _listImg.first;
+    }); //載入資料後，用來刷新畫面
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: Center(
-        child: Column(
+    print(_listImg.length);
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.start,
+      children: [
+        // 顯示進度指示器
+        if (isLoading) LinearProgressIndicator(value: downloadProgress),
+        // Expanded(
+        //   child: SizedBox(
+        //     height: 64,
+        //     width: 128,
+        //     child: ListView.builder(
+        //       // padding: EdgeInsets.all(8),
+        //       scrollDirection: Axis.horizontal, //水平捲動，水平方向產生清單
+        //       itemCount: _listImg.length,
+        //       itemBuilder: (BuildContext context, int index) {
+        //         return SizedBox(width: 64, child: _listImg[index]);
+        //       },
+        //     ),
+        //   ),
+        // ),
+        // Expanded(
+        //   child: ListView.builder(
+        //     // padding: EdgeInsets.all(8),
+        //     scrollDirection: Axis.vertical, //水平捲動，水平方向產生清單
+        //     itemCount: _listImg.length,
+        //     itemBuilder: (BuildContext context, int index) {
+        //       return SizedBox(
+        //         //width: 64,
+        //         height: 64, // 設定固定高度
+        //         child: _listImg[index],
+        //       );
+        //     },
+        //   ),
+        // ),
+        Row(
           children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                widget.gitHubImg!.isEmpty
-                    ? Placeholder(
-                        fallbackHeight: 64,
-                        fallbackWidth: 64,
-                      )
-                    : widget.gitHubImg![fruitDish[0][0]],
-                widget.gitHubImg!.isEmpty
-                    ? Placeholder(
-                        fallbackHeight: 64,
-                        fallbackWidth: 64,
-                      )
-                    : widget.gitHubImg![fruitDish[0][1]],
-                widget.gitHubImg!.isEmpty
-                    ? Placeholder(
-                        fallbackHeight: 64,
-                        fallbackWidth: 64,
-                      )
-                    : widget.gitHubImg![fruitDish[0][2]],
-              ],
+            Expanded(
+              child: GestureDetector(
+                onTap: _toggleImage,
+                child: AnimatedSwitcher(
+                  transitionBuilder:
+                      (Widget child, Animation<double> animation) {
+                    return ScaleTransition(scale: animation, child: child);
+                  },
+                  duration: Duration(milliseconds: 300),
+                  child: _currentImg,
+                ),
+              ),
             ),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                widget.gitHubImg!.isEmpty
-                    ? Placeholder(
-                        fallbackHeight: 64,
-                        fallbackWidth: 64,
-                      )
-                    : widget.gitHubImg![fruitDish[1][0]],
-                widget.gitHubImg!.isEmpty
-                    ? Placeholder(
-                        fallbackHeight: 64,
-                        fallbackWidth: 64,
-                      )
-                    : widget.gitHubImg![fruitDish[1][1]],
-                widget.gitHubImg!.isEmpty
-                    ? Placeholder(
-                        fallbackHeight: 64,
-                        fallbackWidth: 64,
-                      )
-                    : widget.gitHubImg![fruitDish[1][2]],
-              ],
-            ),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                widget.gitHubImg!.isEmpty
-                    ? Placeholder(
-                        fallbackHeight: 64,
-                        fallbackWidth: 64,
-                      )
-                    : widget.gitHubImg![fruitDish[2][0]],
-                widget.gitHubImg!.isEmpty
-                    ? Placeholder(
-                        fallbackHeight: 64,
-                        fallbackWidth: 64,
-                      )
-                    : widget.gitHubImg![fruitDish[2][1]],
-                widget.gitHubImg!.isEmpty
-                    ? Placeholder(
-                        fallbackHeight: 64,
-                        fallbackWidth: 64,
-                      )
-                    : widget.gitHubImg![fruitDish[2][2]],
-              ],
-            ),
-            ElevatedButton(
-                onPressed: () {
-                  // 每 2 秒執行一次 _executeTask 方法
-                  _timer1 =
-                      Timer.periodic(Duration(milliseconds: 100), (timer) {
-                    _executeTask();
-                  });
-                },
-                child: Text('隨機抽一張卡')),
           ],
         ),
-      ),
+        ElevatedButton(
+          onPressed: () {
+            _toggleImage();
+          },
+          child: Text('測試'),
+        ),
+      ],
     );
   }
 }
