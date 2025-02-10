@@ -12,7 +12,7 @@ import 'package:http/http.dart' as http; // http LIB
 
 import 'package:path_provider/path_provider.dart'; // path_provider LIB
 
-/// main.dart
+/// main.dart => Amain.dart
 /// 1140208 修改項目
 /// 0.增加註解，產生另一個 main.dart
 /// 1.從遠端下載圖片到本地端，並顯示在 APP 上
@@ -359,10 +359,12 @@ class _MyFruitsState extends State<MyFruits> {
             ElevatedButton(
                 onPressed: () {
                   // 每 100 毫秒執行一次 _executeTask 方法
-                  _timer1 =
-                      Timer.periodic(Duration(milliseconds: 100), (timer) {
-                    _executeTask();
-                  });
+                  _timer1 = Timer.periodic(
+                    Duration(milliseconds: 100),
+                    (timer) {
+                      _executeTask();
+                    },
+                  );
                 },
                 child: Text('運轉')),
           ],
