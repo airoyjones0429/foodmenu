@@ -1,326 +1,52 @@
-import 'dart:io';
+import 'dart:ffi';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'dart:math'; // 使用亂數時要引用這個
 
 import 'dart:async'; //要使用 Timer 要用這個
 
-/// main7.dart => Hmain.dart
+/// main6.dart => Gmain.dart
 /// 1140211
+/// 1.增加畫出線條的設定，用 Stack Column Row 混和的配置
+/// 2.增加畫出得分線條的邏輯
+/// 3.縮短先前的程式碼，GestureDetector 部分改用函數的方式設定
 
-///下載的影像清單，這次把它移到外部，減少狀態控制，傳遞參數
-List<Image> _listImg = [];
-double downloadProgress = 0.0; // 下載進度
-
-bool isLoading = true; // 用來判斷是否正在加載
-
-///==============================================================以下
-///增加金額程序與變數
-
-int currentMoney = 0; //目前的錢
-int bonusMoney = 0; // 中獎的錢
-//面板上下注的錢
-List<int> pannelMoney = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
-
-///面板上的賠率，出現二個相同時，才算贏，贏的錢為下注的 3 倍
-List<int> pannelOdds = [3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3];
-
-///上方面板佈件
-class PlayTopPanel extends StatefulWidget {
-  @override
-  State<PlayTopPanel> createState() => _playTopPannel();
-}
-
-class _playTopPannel extends State<PlayTopPanel> {
-  Timer? _timer1;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        SingleChildScrollView(
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              ElevatedButton(
-                onPressed: () {
-                  setState(() {
-                    currentMoney++;
-                    bonusMoney++;
-                  });
-                },
-                child: Text('增加金幣'),
-              ),
-              ElevatedButton(
-                onPressed: () {
-                  setState(() {
-                    currentMoney--;
-                    bonusMoney--;
-                  });
-                },
-                child: Text('減少金幣'),
-              ),
-              ElevatedButton(
-                onPressed: () {
-                  _timer1 = Timer.periodic(
-                      Duration(milliseconds: 50),
-                      (timer) => setState(() {
-                            if (bonusMoney > 0) {
-                              currentMoney++;
-                              bonusMoney--;
-                            } else {
-                              _timer1?.cancel();
-                            }
-                          }));
-                },
-                child: Text('獎勵金額輸入'),
-              ),
-            ],
-          ),
-        ),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-          children: [
-            Text('目前金額'),
-            SizedBox(
-              width: 50,
-              child: AnimatedSwitcher(
-                duration: Duration(
-                  milliseconds: 300,
-                ),
-                child: Text(
-                  style: TextStyle(
-                    fontSize: 24,
-                  ),
-                  '${currentMoney}',
-                  key: ValueKey<int>(currentMoney),
-                ),
-              ),
-            ),
-            Text('中獎金額'),
-            SizedBox(
-              width: 50,
-              child: AnimatedSwitcher(
-                duration: Duration(
-                  milliseconds: 200,
-                ),
-                child: Text(
-                  style: TextStyle(
-                    fontSize: 24,
-                  ),
-                  '${bonusMoney}',
-                  key: ValueKey<int>(bonusMoney),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-}
-
-class PlayButtonPanel extends StatefulWidget {
-  ///用 Global Key 讓刷新圖片的 Widget 也刷新這個 Widget 狀態
-  ///flutter 官方不建議使用  用不好  程式並不容易維護
-  ///要被動刷新的宣告下面那行指令
-  PlayButtonPanel({Key? key}) : super(key: key);
-
-  @override
-  State<PlayButtonPanel> createState() => _PlayBottonPanelState();
-}
-
-class _PlayBottonPanelState extends State<PlayButtonPanel> {
-  ///更新狀態
-  void updateState() {
-    setState(() {
-      isLoading = false;
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: 300,
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          SizedBox(
-            height: 100,
-            child: SingleChildScrollView(
-              //包住 ROW 就是水平卷軸
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: [
-                  ElevatedButton.icon(
-                    label: Text(
-                      '${pannelMoney[0]}',
-                    ),
-                    icon: !isLoading ? _listImg[0] : Placeholder(),
-                    onPressed: () {
-                      setState(() {
-                        pannelMoney[0]++;
-                      });
-                    },
-                  ),
-                  ElevatedButton.icon(
-                    label: Text(
-                      '${pannelMoney[1]}',
-                    ),
-                    icon: !isLoading ? _listImg[1] : Placeholder(),
-                    onPressed: () {
-                      setState(() {
-                        pannelMoney[1]++;
-                      });
-                    },
-                  ),
-                  ElevatedButton.icon(
-                    label: Text(
-                      '${pannelMoney[2]}',
-                    ),
-                    icon: !isLoading ? _listImg[2] : Placeholder(),
-                    onPressed: () {
-                      setState(() {
-                        pannelMoney[2]++;
-                      });
-                    },
-                  ),
-                  ElevatedButton.icon(
-                    label: Text(
-                      '${pannelMoney[3]}',
-                    ),
-                    icon: !isLoading ? _listImg[3] : Placeholder(),
-                    onPressed: () {
-                      setState(() {
-                        pannelMoney[3]++;
-                      });
-                    },
-                  ),
-                  ElevatedButton.icon(
-                    label: Text(
-                      '${pannelMoney[4]}',
-                    ),
-                    icon: !isLoading ? _listImg[4] : Placeholder(),
-                    onPressed: () {
-                      setState(() {
-                        pannelMoney[4]++;
-                      });
-                    },
-                  ),
-                  ElevatedButton.icon(
-                    label: Text(
-                      '${pannelMoney[5]}',
-                    ),
-                    icon: !isLoading ? _listImg[5] : Placeholder(),
-                    onPressed: () {
-                      setState(() {
-                        pannelMoney[5]++;
-                      });
-                    },
-                  ),
-                  ElevatedButton.icon(
-                    label: Text(
-                      '${pannelMoney[6]}',
-                    ),
-                    icon: !isLoading ? _listImg[6] : Placeholder(),
-                    onPressed: () {
-                      setState(() {
-                        pannelMoney[6]++;
-                      });
-                    },
-                  ),
-                  ElevatedButton.icon(
-                    label: Text(
-                      '${pannelMoney[7]}',
-                    ),
-                    icon: !isLoading ? _listImg[7] : Placeholder(),
-                    onPressed: () {
-                      setState(() {
-                        pannelMoney[7]++;
-                      });
-                    },
-                  ),
-                  ElevatedButton.icon(
-                    label: Text(
-                      '${pannelMoney[8]}',
-                    ),
-                    icon: !isLoading ? _listImg[8] : Placeholder(),
-                    onPressed: () {
-                      setState(() {
-                        pannelMoney[8]++;
-                      });
-                    },
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-///增加金額程序與變數
-///================================================================以上
+///在 Flutter 中，SizedBox 是一個用來限制其子部件大小的容器。
+///在你的代碼中，SizedBox 的高度和寬度都設定為 192，這意味著它
+///會強制其子部件（在這裡是 Container）的大小為 192 x 192。
+///儘管你在 Container 中設定了高度為 5 和寬度為 100，
+///但因為 SizedBox 的限制，Container 仍然會佔據 192 x 192 的空間。
+///這是因為 SizedBox 會擴展其子部件以填滿指定的大小。
+///如果你希望 Container 僅顯示為 100 x 5 的紅色方塊，你可以考慮將
+///Container 放在不受 SizedBox 限制的上下文中，或者直接使用 Container 並設定其大小。
 
 void main() {
   runApp(MyApp());
 }
 
-class MyApp extends StatefulWidget {
-  const MyApp({super.key});
-
-  @override
-  State<MyApp> createState() => _MyAppState();
-}
-
-class _MyAppState extends State<MyApp> {
+class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       home: Scaffold(
-        appBar: AppBar(title: Text("水果拼盤遊戲")),
-
-        ///把遊戲放到 ListView 中
-        ///因為 ImageSwitcher 大小是會變化的
-        ///必須要用 SizeBox 限制大小，沒限制會出現錯誤
-        body: ListView(
-          children: [
-            PlayTopPanel(),
-            SizedBox(
-              height: 600,
-              width: 400,
-              child: ImageSwitcher(),
-            ),
-            PlayButtonPanel(),
-          ],
-        ),
+        appBar: AppBar(title: Text("圖片動畫示範")),
+        body: ImageSwitcher(),
       ),
     );
   }
 }
 
-///=====================================================================
-///=====================================================================
-///=====================================================================
-///=====================================================================
-///
-/// 水果盤的主要 Widget
-///
-///=====================================================================
-///=====================================================================
-///=====================================================================
-///=====================================================================
 class ImageSwitcher extends StatefulWidget {
   @override
   _ImageSwitcherState createState() => _ImageSwitcherState();
 }
 
 class _ImageSwitcherState extends State<ImageSwitcher> {
-  //Global Key PlayButtonPanel
-  final GlobalKey<_PlayBottonPanelState> playButtonPanel = GlobalKey();
+  double downloadProgress = 0.0; // 下載進度
+
+  bool isLoading = true; // 用來判斷是否正在加載
 
   ///可以改成圖片清單
   Image? _currentImg1;
@@ -348,6 +74,8 @@ class _ImageSwitcherState extends State<ImageSwitcher> {
   List<bool> hLine = [false, false, false]; //上中下水平線，是否要畫出
   List<bool> vLine = [false, false, false]; //左中右垂直線，是否要畫出
   List<bool> sLine = [false, false]; //左上右下、右上左下，使否要畫出
+
+  List<Image> _listImg = [];
 
   List<String> imageUrls = [
     'https://github.com/airoyjones0429/foodmenu/blob/main/fruitimg/fruit01.png?raw=true',
@@ -384,7 +112,7 @@ class _ImageSwitcherState extends State<ImageSwitcher> {
       currentImageIndex = random.nextInt(_listImg.length);
     }
 
-    // print(_listImg[currentImageIndex].key);
+    print(_listImg[currentImageIndex].key);
 
     return _listImg[currentImageIndex];
   }
@@ -430,11 +158,6 @@ class _ImageSwitcherState extends State<ImageSwitcher> {
       _currentImg7 = _listImg.first; //下載完成，顯示第一張圖片
       _currentImg8 = _listImg.first; //下載完成，顯示第一張圖片
       _currentImg9 = _listImg.first; //下載完成，顯示第一張圖片
-
-      ///用 Global Key 來要求執行另一個 Widget 的函數
-      ///因為 playButtonPanel.currentState 是 Null 所以沒效果
-      ///下次要增加狀態管理，來處理
-      playButtonPanel.currentState?.updateState();
     }); //載入資料後，用來刷新畫面
   }
 
@@ -544,12 +267,9 @@ class _ImageSwitcherState extends State<ImageSwitcher> {
     setState(() {});
   }
 
-  ///畫出得分的線條
-  ///======================以上
-
   @override
   Widget build(BuildContext context) {
-    // print(_listImg.length);
+    print(_listImg.length);
     return Scaffold(
       backgroundColor: Colors.black,
       body: Row(
