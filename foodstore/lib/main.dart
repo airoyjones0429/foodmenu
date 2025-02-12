@@ -8,12 +8,23 @@ import 'dart:async'; //要使用 Timer 要用這個
 
 /// main7.dart => Hmain.dart
 /// 1140211
+/// 1.將圖片清單宣告成全域，還有一些相關的，也宣告成全域變數
+///   很偷懶的方法，會減少傳遞參數的步驟
+/// 2.規劃計算金額的介面，設定計算獎金的倍率
+/// 3.原本要使用 Global Key 的方式，刷新畫面，遇到指令沒執行也沒錯誤的問題
+///   該部分先保留，之後，有機會再另外練習
+/// 4.把 MyApp 改成能儲存狀態的 StatefulWidget
+/// 5.把 MyApp 改為用 清單的方式來顯示頁面
+
+/// GlobalKey 放到外也沒辦法成功使用，真的要另外再試了
+final GlobalKey<_playTopPannel> playTopPannel = GlobalKey<_playTopPannel>();
 
 ///下載的影像清單，這次把它移到外部，減少狀態控制，傳遞參數
 List<Image> _listImg = [];
 double downloadProgress = 0.0; // 下載進度
 
 bool isLoading = true; // 用來判斷是否正在加載
+bool isPlaying = false; // 是否正在遊戲中 true 正在運轉，false 沒有在玩
 
 ///==============================================================以下
 ///增加金額程序與變數
@@ -23,31 +34,83 @@ int bonusMoney = 0; // 中獎的錢
 //面板上下注的錢
 List<int> pannelMoney = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
 
-///面板上的賠率，出現二個相同時，才算贏，贏的錢為下注的 3 倍
+///面板上的基本賠率，出現二個相同時，才算贏，贏的錢為下注的 3 倍
 List<int> pannelOdds = [3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3];
 
-///上方面板佈件
+///面板上重複圖片的賠率       1  2   3   4  5  6  7  8   9 張相同圖片
+List<double> pannelPOdds = [0, 1, 1.5, 2, 3, 5, 8, 10, 20];
+
+///因下注而獲得的金額，儲存在這裡
+List<int> priceMoney = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+
+///==========================================
+///
+///
+///               上方面板佈件
+///
+///
+///=========================================
 class PlayTopPanel extends StatefulWidget {
+  final String uniqueId; // 用來生成唯一 Key 的值
+  //設定為 Global Key
+  //嘗試在程式執行在穩定的狀態下，看可不可以用這個方法
+  //如果 Widget 被捲動到看不到，在出現時才會改變
+  PlayTopPanel({
+    Key? key, //將父類別設定的 key 內容，設定給目前的 Widget --- 2
+    required this.uniqueId,
+  }) : super(key: ValueKey(uniqueId)); //設定繼承父類別的 key 值 --- 1
   @override
   State<PlayTopPanel> createState() => _playTopPannel();
 }
 
 class _playTopPannel extends State<PlayTopPanel> {
   Timer? _timer1;
+  Timer? _timer2;
+
+  @override
+  void dispose() {
+    super.dispose();
+    _timer1?.cancel();
+    _timer2?.cancel();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+
+    ///定時檢查有沒有獎勵金，如果有 就動態加錢
+    _timer2 = Timer.periodic(Duration(milliseconds: 500), (timer) {
+      _updateTopPanelMoney();
+    });
+  }
+
+  void _updateTopPanelMoney() {
+    _timer1 = Timer.periodic(
+        Duration(milliseconds: 50),
+        (timer) => setState(() {
+              if (bonusMoney > 0) {
+                currentMoney++;
+                bonusMoney--;
+              } else {
+                timer.cancel();
+              }
+            }));
+  }
 
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
         SingleChildScrollView(
+          scrollDirection: Axis.horizontal, //這裡要設定，不然會 Layout 錯誤
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
               ElevatedButton(
                 onPressed: () {
                   setState(() {
-                    currentMoney++;
-                    bonusMoney++;
+                    currentMoney += 10;
+                    // bonusMoney++;
                   });
                 },
                 child: Text('增加金幣'),
@@ -56,25 +119,20 @@ class _playTopPannel extends State<PlayTopPanel> {
                 onPressed: () {
                   setState(() {
                     currentMoney--;
-                    bonusMoney--;
+                    // bonusMoney--;
                   });
                 },
                 child: Text('減少金幣'),
               ),
               ElevatedButton(
                 onPressed: () {
-                  _timer1 = Timer.periodic(
-                      Duration(milliseconds: 50),
-                      (timer) => setState(() {
-                            if (bonusMoney > 0) {
-                              currentMoney++;
-                              bonusMoney--;
-                            } else {
-                              _timer1?.cancel();
-                            }
-                          }));
+                  _updateTopPanelMoney();
                 },
                 child: Text('獎勵金額輸入'),
+              ),
+              ElevatedButton(
+                onPressed: () {},
+                child: Text('刷新狀態'),
               ),
             ],
           ),
@@ -121,6 +179,13 @@ class _playTopPannel extends State<PlayTopPanel> {
   }
 }
 
+///==========================================================
+///
+///
+///         下方下注按鈕 控制面板
+///
+///
+///==========================================================
 class PlayButtonPanel extends StatefulWidget {
   ///用 Global Key 讓刷新圖片的 Widget 也刷新這個 Widget 狀態
   ///flutter 官方不建議使用  用不好  程式並不容易維護
@@ -132,131 +197,405 @@ class PlayButtonPanel extends StatefulWidget {
 }
 
 class _PlayBottonPanelState extends State<PlayButtonPanel> {
+  ///因為沒辦法用另外一個 Widget 觸發這個 Widget 更新狀態 (或說更新畫面)
+  ///就改使用計時器定時看來處理刷新圖片的狀態
+  Timer? _timerUpdateButton;
+  Timer? _timerUpdateButtonMoney;
+
+  ///這個事件會在 initState() 之後發生
+  ///因為 iniState() 中不能初始化 Widget 狀態
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _timerUpdateButton = Timer.periodic(Duration(milliseconds: 500), (time) {
+      if (!isLoading) {
+        updateState(); //刷新畫面後，就釋放計時器
+        _timerUpdateButton?.cancel();
+      }
+    });
+
+    _timerUpdateButtonMoney =
+        Timer.periodic(Duration(milliseconds: 500), (time) {
+      setState(() {
+        // print('Test207');
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _timerUpdateButton?.cancel();
+    _timerUpdateButtonMoney?.cancel();
+    super.dispose();
+  }
+
   ///更新狀態
   void updateState() {
-    setState(() {
-      isLoading = false;
-    });
+    setState(() {});
   }
 
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 300,
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          SizedBox(
-            height: 100,
-            child: SingleChildScrollView(
-              //包住 ROW 就是水平卷軸
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: [
-                  ElevatedButton.icon(
-                    label: Text(
-                      '${pannelMoney[0]}',
+      height: 100,
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            SizedBox(
+              height: 80,
+              child: SingleChildScrollView(
+                //包住 ROW 就是水平卷軸
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    ///下注按鈕區
+                    ///按下第  1 個按鈕
+                    ElevatedButton.icon(
+                      label: Text(
+                        '${pannelMoney[0]}',
+                      ),
+                      icon: SizedBox(
+                          width: 32,
+                          child: !isLoading ? _listImg[0] : Placeholder()),
+                      onPressed: () {
+                        setState(() {
+                          if (currentMoney > 0) {
+                            pannelMoney[0]++;
+                            currentMoney--;
+                          }
+
+                          ///下面為使用 Global Key 的方法，因為沒用所以註解掉
+                          // print(playTopPannel.currentState?.mounted);
+                          // playTopPannel.currentState?.setState(() {});
+                        });
+                      },
+                      onLongPress: () {
+                        setState(() {
+                          if (currentMoney - 10 > 0) {
+                            pannelMoney[0] += 10;
+                            currentMoney -= 10;
+                          } else if (currentMoney > 0) {
+                            pannelMoney[0] += currentMoney;
+                            currentMoney = 0;
+                          }
+                        });
+                      },
                     ),
-                    icon: !isLoading ? _listImg[0] : Placeholder(),
-                    onPressed: () {
-                      setState(() {
-                        pannelMoney[0]++;
-                      });
-                    },
-                  ),
-                  ElevatedButton.icon(
-                    label: Text(
-                      '${pannelMoney[1]}',
+                    ElevatedButton.icon(
+                      label: Text(
+                        '${pannelMoney[1]}',
+                      ),
+                      icon: SizedBox(
+                          width: 32,
+                          child: !isLoading ? _listImg[1] : Placeholder()),
+                      onPressed: () {
+                        setState(() {
+                          if (currentMoney > 0) {
+                            pannelMoney[1]++;
+                            currentMoney--;
+                          }
+                        });
+                      },
+                      onLongPress: () {
+                        setState(() {
+                          if (currentMoney - 10 > 0) {
+                            pannelMoney[1] += 10;
+                            currentMoney -= 10;
+                          } else if (currentMoney > 0) {
+                            pannelMoney[1] += currentMoney;
+                            currentMoney = 0;
+                          }
+                        });
+                      },
                     ),
-                    icon: !isLoading ? _listImg[1] : Placeholder(),
-                    onPressed: () {
-                      setState(() {
-                        pannelMoney[1]++;
-                      });
-                    },
-                  ),
-                  ElevatedButton.icon(
-                    label: Text(
-                      '${pannelMoney[2]}',
+                    ElevatedButton.icon(
+                      label: Text(
+                        '${pannelMoney[2]}',
+                      ),
+                      icon: SizedBox(
+                          width: 32,
+                          child: !isLoading ? _listImg[2] : Placeholder()),
+                      onPressed: () {
+                        setState(() {
+                          if (currentMoney > 0) {
+                            pannelMoney[2]++;
+                            currentMoney--;
+                          }
+                        });
+                      },
+                      onLongPress: () {
+                        setState(() {
+                          if (currentMoney - 10 > 0) {
+                            pannelMoney[2] += 10;
+                            currentMoney -= 10;
+                          } else if (currentMoney > 0) {
+                            pannelMoney[2] += currentMoney;
+                            currentMoney = 0;
+                          }
+                        });
+                      },
                     ),
-                    icon: !isLoading ? _listImg[2] : Placeholder(),
-                    onPressed: () {
-                      setState(() {
-                        pannelMoney[2]++;
-                      });
-                    },
-                  ),
-                  ElevatedButton.icon(
-                    label: Text(
-                      '${pannelMoney[3]}',
+                    ElevatedButton.icon(
+                      label: Text(
+                        '${pannelMoney[3]}',
+                      ),
+                      icon: SizedBox(
+                          width: 32,
+                          child: !isLoading ? _listImg[3] : Placeholder()),
+                      onPressed: () {
+                        setState(() {
+                          if (currentMoney > 0) {
+                            pannelMoney[3]++;
+                            currentMoney--;
+                          }
+                        });
+                      },
+                      onLongPress: () {
+                        setState(() {
+                          if (currentMoney - 10 > 0) {
+                            pannelMoney[3] += 10;
+                            currentMoney -= 10;
+                          } else if (currentMoney > 0) {
+                            pannelMoney[3] += currentMoney;
+                            currentMoney = 0;
+                          }
+                        });
+                      },
                     ),
-                    icon: !isLoading ? _listImg[3] : Placeholder(),
-                    onPressed: () {
-                      setState(() {
-                        pannelMoney[3]++;
-                      });
-                    },
-                  ),
-                  ElevatedButton.icon(
-                    label: Text(
-                      '${pannelMoney[4]}',
+                    ElevatedButton.icon(
+                      label: Text(
+                        '${pannelMoney[4]}',
+                      ),
+                      icon: SizedBox(
+                          width: 32,
+                          child: !isLoading ? _listImg[4] : Placeholder()),
+                      onPressed: () {
+                        setState(() {
+                          if (currentMoney > 0) {
+                            pannelMoney[4]++;
+                            currentMoney--;
+                          }
+                        });
+                      },
+                      onLongPress: () {
+                        setState(() {
+                          if (currentMoney - 10 > 0) {
+                            pannelMoney[4] += 10;
+                            currentMoney -= 10;
+                          } else if (currentMoney > 0) {
+                            pannelMoney[4] += currentMoney;
+                            currentMoney = 0;
+                          }
+                        });
+                      },
                     ),
-                    icon: !isLoading ? _listImg[4] : Placeholder(),
-                    onPressed: () {
-                      setState(() {
-                        pannelMoney[4]++;
-                      });
-                    },
-                  ),
-                  ElevatedButton.icon(
-                    label: Text(
-                      '${pannelMoney[5]}',
+                    ElevatedButton.icon(
+                      label: Text(
+                        '${pannelMoney[5]}',
+                      ),
+                      icon: SizedBox(
+                          width: 32,
+                          child: !isLoading ? _listImg[5] : Placeholder()),
+                      onLongPress: () {
+                        setState(() {
+                          if (currentMoney - 10 > 0) {
+                            pannelMoney[5] += 10;
+                            currentMoney -= 10;
+                          } else if (currentMoney > 0) {
+                            pannelMoney[5] += currentMoney;
+                            currentMoney = 0;
+                          }
+                        });
+                      },
+                      onPressed: () {
+                        setState(() {
+                          if (currentMoney > 0) {
+                            pannelMoney[5]++;
+                            currentMoney--;
+                          }
+                        });
+                      },
                     ),
-                    icon: !isLoading ? _listImg[5] : Placeholder(),
-                    onPressed: () {
-                      setState(() {
-                        pannelMoney[5]++;
-                      });
-                    },
-                  ),
-                  ElevatedButton.icon(
-                    label: Text(
-                      '${pannelMoney[6]}',
+                    ElevatedButton.icon(
+                      label: Text(
+                        '${pannelMoney[6]}',
+                      ),
+                      icon: SizedBox(
+                          width: 32,
+                          child: !isLoading ? _listImg[6] : Placeholder()),
+                      onPressed: () {
+                        setState(() {
+                          if (currentMoney > 0) {
+                            pannelMoney[6]++;
+                            currentMoney--;
+                          }
+                        });
+                      },
+                      onLongPress: () {
+                        setState(() {
+                          if (currentMoney - 10 > 0) {
+                            pannelMoney[6] += 10;
+                            currentMoney -= 10;
+                          } else if (currentMoney > 0) {
+                            pannelMoney[6] += currentMoney;
+                            currentMoney = 0;
+                          }
+                        });
+                      },
                     ),
-                    icon: !isLoading ? _listImg[6] : Placeholder(),
-                    onPressed: () {
-                      setState(() {
-                        pannelMoney[6]++;
-                      });
-                    },
-                  ),
-                  ElevatedButton.icon(
-                    label: Text(
-                      '${pannelMoney[7]}',
+                    ElevatedButton.icon(
+                      label: Text(
+                        '${pannelMoney[7]}',
+                      ),
+                      icon: SizedBox(
+                          width: 32,
+                          child: !isLoading ? _listImg[7] : Placeholder()),
+                      onPressed: () {
+                        setState(() {
+                          if (currentMoney > 0) {
+                            pannelMoney[7]++;
+                            currentMoney--;
+                          }
+                        });
+                      },
+                      onLongPress: () {
+                        setState(() {
+                          if (currentMoney - 10 > 0) {
+                            pannelMoney[7] += 10;
+                            currentMoney -= 10;
+                          } else if (currentMoney > 0) {
+                            pannelMoney[7] += currentMoney;
+                            currentMoney = 0;
+                          }
+                        });
+                      },
                     ),
-                    icon: !isLoading ? _listImg[7] : Placeholder(),
-                    onPressed: () {
-                      setState(() {
-                        pannelMoney[7]++;
-                      });
-                    },
-                  ),
-                  ElevatedButton.icon(
-                    label: Text(
-                      '${pannelMoney[8]}',
+                    ElevatedButton.icon(
+                      label: Text(
+                        '${pannelMoney[8]}',
+                      ),
+                      icon: SizedBox(
+                          width: 32,
+                          child: !isLoading ? _listImg[8] : Placeholder()),
+                      onPressed: () {
+                        setState(() {
+                          if (currentMoney > 0) {
+                            pannelMoney[8]++;
+                            currentMoney--;
+                          }
+                        });
+                      },
+                      onLongPress: () {
+                        setState(() {
+                          if (currentMoney - 10 > 0) {
+                            pannelMoney[8] += 10;
+                            currentMoney -= 10;
+                          } else if (currentMoney > 0) {
+                            pannelMoney[8] += currentMoney;
+                            currentMoney = 0;
+                          }
+                        });
+                      },
                     ),
-                    icon: !isLoading ? _listImg[8] : Placeholder(),
-                    onPressed: () {
-                      setState(() {
-                        pannelMoney[8]++;
-                      });
-                    },
-                  ),
-                ],
+                    ElevatedButton.icon(
+                      label: Text(
+                        '${pannelMoney[9]}',
+                      ),
+                      icon: SizedBox(
+                          width: 32,
+                          child: !isLoading ? _listImg[9] : Placeholder()),
+                      onPressed: () {
+                        setState(() {
+                          if (currentMoney > 0) {
+                            pannelMoney[9]++;
+                            currentMoney--;
+                          }
+                        });
+                      },
+                      onLongPress: () {
+                        setState(() {
+                          if (currentMoney - 10 > 0) {
+                            pannelMoney[9] += 10;
+                            currentMoney -= 10;
+                          } else if (currentMoney > 0) {
+                            pannelMoney[9] += currentMoney;
+                            currentMoney = 0;
+                          }
+                        });
+                      },
+                    ),
+
+                    ElevatedButton.icon(
+                      label: Text(
+                        '${pannelMoney[10]}',
+                      ),
+                      icon: SizedBox(
+                          width: 32,
+                          child: !isLoading ? _listImg[10] : Placeholder()),
+                      onPressed: () {
+                        setState(() {
+                          if (currentMoney > 0) {
+                            pannelMoney[10]++;
+                            currentMoney--;
+                          }
+                        });
+                      },
+                      onLongPress: () {
+                        setState(() {
+                          if (currentMoney - 10 > 0) {
+                            pannelMoney[10] += 10;
+                            currentMoney -= 10;
+                          } else if (currentMoney > 0) {
+                            pannelMoney[10] += currentMoney;
+                            currentMoney = 0;
+                          }
+                        });
+                      },
+                    ),
+
+                    ElevatedButton.icon(
+                      label: Text(
+                        '${pannelMoney[11]}',
+                      ),
+                      icon: SizedBox(
+                          width: 32,
+                          child: !isLoading ? _listImg[11] : Placeholder()),
+                      onPressed: () {
+                        setState(() {
+                          if (currentMoney > 0) {
+                            pannelMoney[11]++;
+                            currentMoney--;
+                          }
+                        });
+                      },
+                      onLongPress: () {
+                        setState(() {
+                          if (currentMoney - 10 > 0) {
+                            pannelMoney[11] += 10;
+                            currentMoney -= 10;
+                          } else if (currentMoney > 0) {
+                            pannelMoney[11] += currentMoney;
+                            currentMoney = 0;
+                          }
+                        });
+                      },
+                    ),
+                  ],
+                ),
               ),
             ),
-          ),
-        ],
+            ElevatedButton.icon(
+              label: Text(
+                '刷新按鈕',
+              ),
+              icon: SizedBox(height: 32, width: 32, child: Placeholder()),
+              onPressed: () {
+                setState(() {});
+              },
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -288,10 +627,12 @@ class _MyAppState extends State<MyApp> {
         ///必須要用 SizeBox 限制大小，沒限制會出現錯誤
         body: ListView(
           children: [
-            PlayTopPanel(),
+            PlayTopPanel(
+              uniqueId: 'myPlayTopPanel',
+            ),
             SizedBox(
-              height: 600,
-              width: 400,
+              height: 400,
+              // width: 400,
               child: ImageSwitcher(),
             ),
             PlayButtonPanel(),
@@ -320,7 +661,8 @@ class ImageSwitcher extends StatefulWidget {
 
 class _ImageSwitcherState extends State<ImageSwitcher> {
   //Global Key PlayButtonPanel
-  final GlobalKey<_PlayBottonPanelState> playButtonPanel = GlobalKey();
+  final GlobalKey<_PlayBottonPanelState> playButtonPanel =
+      GlobalKey<_PlayBottonPanelState>();
 
   ///可以改成圖片清單
   Image? _currentImg1;
@@ -365,7 +707,7 @@ class _ImageSwitcherState extends State<ImageSwitcher> {
   ];
 
   /// 計時器物件的宣告
-  Timer? _timer1;
+  Timer? _timerFruitDish;
   int _counterTimer1 = 0; //計時器計數用
 
   @override
@@ -455,7 +797,8 @@ class _ImageSwitcherState extends State<ImageSwitcher> {
     _counterTimer1++;
     if (_counterTimer1 >= 10) {
       _counterTimer1 = 0;
-      _timer1?.cancel();
+      _timerFruitDish?.cancel();
+      computeMoney(); //當隨機圖片後，計算中獎金額
       drawPriceLine(); //當隨機圖片後，自動化出現來
     }
   }
@@ -540,12 +883,94 @@ class _ImageSwitcherState extends State<ImageSwitcher> {
     ///斜線設定
     sLine[0] = (fruitDish[0] == fruitDish[4]) && (fruitDish[0] == fruitDish[8]);
     sLine[1] = (fruitDish[2] == fruitDish[4]) && (fruitDish[2] == fruitDish[6]);
-
-    setState(() {});
   }
 
   ///畫出得分的線條
   ///======================以上
+
+  ///=======================以下
+  ///計算中獎金額
+  void computeMoney() {
+    int showTimer = 0; //顯示次數
+    ///有下注的才計算是否有中獎
+    for (int index = 0; index < pannelMoney.length; index++) {
+      ///如果金額大於 0 ，就計算是否符合中獎規則
+      if (pannelMoney[index] > 0) {
+        Key? imgKey = _listImg[index].key; //保存目前下注的圖片Key
+
+        for (Image _currentImg in [
+          _currentImg1!,
+          _currentImg2!,
+          _currentImg3!,
+          _currentImg4!,
+          _currentImg5!,
+          _currentImg6!,
+          _currentImg7!,
+          _currentImg8!,
+          _currentImg9!
+        ]) {
+          if (imgKey == _currentImg.key) {
+            ///下注的圖片KEY 等於 目前在畫面上的圖片 KEY 就加一
+            showTimer++;
+          }
+        }
+      }
+
+      ///計算中獎金額，並將金額儲存到 priceMoney 中
+      priceMoney[index] = (showTimer < 2) //沒中獎，只有出現一次
+          ? 0
+          : (showTimer < 3) //中獎，出現 2 次
+              ? (pannelOdds[index] * pannelMoney[index] * pannelPOdds[1])
+                  .toInt()
+              : (showTimer < 4) //中獎，出現 3 次
+                  ? (pannelOdds[index] * pannelMoney[index] * pannelPOdds[2])
+                      .toInt()
+                  : (showTimer < 5) //中獎，出現 4 次
+                      ? (pannelOdds[index] *
+                              pannelMoney[index] *
+                              pannelPOdds[3])
+                          .toInt()
+                      : (showTimer < 6) //中獎，出現 5 次
+                          ? (pannelOdds[index] *
+                                  pannelMoney[index] *
+                                  pannelPOdds[4])
+                              .toInt()
+                          : (showTimer < 7) //中獎，出現 6 次
+                              ? (pannelOdds[index] *
+                                      pannelMoney[index] *
+                                      pannelPOdds[5])
+                                  .toInt()
+                              : (showTimer < 8) //中獎，出現 7 次
+                                  ? (pannelOdds[index] *
+                                          pannelMoney[index] *
+                                          pannelPOdds[6])
+                                      .toInt()
+                                  : (showTimer < 9) //中獎，出現 8 次，
+                                      ? (pannelOdds[index] *
+                                              pannelMoney[index] *
+                                              pannelPOdds[7])
+                                          .toInt()
+                                      //中獎，出現九次
+                                      : (pannelOdds[index] *
+                                              pannelMoney[index] *
+                                              pannelPOdds[8])
+                                          .toInt();
+
+      ///處理判斷中獎後，清空下注金額
+      pannelMoney[index] = 0;
+
+      ///清空出現次數
+      showTimer = 0;
+    }
+
+    ///將所有中獎的金額加到 bonusMoney 中
+    for (int money in priceMoney) {
+      bonusMoney += money;
+    }
+  }
+
+  ///計算中獎金額
+  ///=======================以下
 
   @override
   Widget build(BuildContext context) {
@@ -830,35 +1255,63 @@ class _ImageSwitcherState extends State<ImageSwitcher> {
                 ],
               ),
               SizedBox(
-                height: 100,
+                height: 10,
               ),
-              ElevatedButton(
-                onPressed: () {
-                  // 每 100 毫秒執行一次 selectImg 方法
-                  _timer1 = Timer.periodic(
-                    Duration(milliseconds: 100),
-                    (timer) {
-                      selectImg();
-                    },
-                  );
-                },
-                child: Text('測試'),
-              ),
-              ElevatedButton(
-                onPressed: () {
-                  // print(_currentImg1!.key);
-                  // print(_currentImg2!.key);
-                  // print(_currentImg3!.key);
-                  // print(_currentImg4!.key);
-                  // print(_currentImg5!.key);
-                  // print(_currentImg6!.key);
-                  // print(_currentImg7!.key);
-                  // print(_currentImg8!.key);
-                  // print(_currentImg9!.key);
-                  // setState(() {});
-                  drawPriceLine();
-                },
-                child: Text('計算分數'),
+              SizedBox(
+                height: 50,
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.vertical,
+                  child: Column(
+                    children: [
+                      ElevatedButton(
+                        onPressed: () {
+                          // 每 100 毫秒執行一次 selectImg 方法
+                          _timerFruitDish = Timer.periodic(
+                            Duration(milliseconds: 100),
+                            (timer) {
+                              selectImg();
+                            },
+                          );
+                        },
+                        child: Text('測試'),
+                      ),
+                      ElevatedButton(
+                        onPressed: () {
+                          // print(_currentImg1!.key);
+                          // print(_currentImg2!.key);
+                          // print(_currentImg3!.key);
+                          // print(_currentImg4!.key);
+                          // print(_currentImg5!.key);
+                          // print(_currentImg6!.key);
+                          // print(_currentImg7!.key);
+                          // print(_currentImg8!.key);
+                          // print(_currentImg9!.key);
+                          // setState(() {});
+
+                          setState(() {
+                            computeMoney(); //計算中獎金額
+                            drawPriceLine(); //畫出線條
+                          });
+                        },
+                        child: Text('計算分數'),
+                      ),
+                      ElevatedButton(
+                        onPressed: () {
+                          setState(() {
+                            // 每 100 毫秒執行一次 selectImg 方法
+                            _timerFruitDish = Timer.periodic(
+                              Duration(milliseconds: 100),
+                              (timer) {
+                                selectImg();
+                              },
+                            );
+                          });
+                        },
+                        child: Text('開始'),
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ],
           ),
