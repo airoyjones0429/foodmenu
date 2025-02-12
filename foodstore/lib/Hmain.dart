@@ -2,62 +2,67 @@ import 'package:flutter/material.dart';
 import 'dart:math'; // 使用亂數時要引用這個
 import 'dart:async'; //要使用 Timer 要用這個
 
-/// main8.dart => Imain.dart
+/// main7.dart => Hmain.dart
 /// 1140211
-/// 1.排列程式碼，把沒用的處理掉
+/// 1.將圖片清單宣告成全域，還有一些相關的，也宣告成全域變數
+///   很偷懶的方法，會減少傳遞參數的步驟
+/// 2.規劃計算金額的介面，設定計算獎金的倍率
+/// 3.原本要使用 Global Key 的方式，刷新畫面，遇到指令沒執行也沒錯誤的問題
+///   該部分先保留，之後，有機會再另外練習
+/// 4.把 MyApp 改成能儲存狀態的 StatefulWidget
+/// 5.把 MyApp 改為用 清單的方式來顯示頁面
 
-///０００００００００００００００００００００００００００００００００００００００００
-///０００００００００００００００００００００００００００００００００００００００００
-///
-///                                全域性宣告
-///
-///                         所有函式、物件都可以讀取
-///
-///０００００００００００００００００００００００００００００００００００００００００
-///０００００００００００００００００００００００００００００００００００００００００
+/// GlobalKey 放到外也沒辦法成功使用，真的要另外再試了
+final GlobalKey<_playTopPannel> playTopPannel = GlobalKey<_playTopPannel>();
 
-///影像清單，將網路上的圖片，暫存到APP中。
+///下載的影像清單，這次把它移到外部，減少狀態控制，傳遞參數
 List<Image> _listImg = [];
+double downloadProgress = 0.0; // 下載進度
 
-///用來判斷是否正在加載
-bool isLoading = true;
+bool isLoading = true; // 用來判斷是否正在加載
+bool isPlaying = false; // 是否正在遊戲中 true 正在運轉，false 沒有在玩
 
-///玩家所擁有的金額
-int currentMoney = 0;
+///==============================================================以下
+///增加金額程序與變數
 
-///下注中獎獲得的金額
-int bonusMoney = 0;
-
-///APP下方面板上下注的錢，儲存在這裡，與網路上圖片清單對應位置。
+int currentMoney = 0; //目前的錢
+int bonusMoney = 0; // 中獎的錢
+//面板上下注的錢
 List<int> pannelMoney = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
 
-///面板上的基本賠率，出現二個相同時，才算贏，贏的錢為下注的 3 倍，與網路上圖片清單對應位置。
+///面板上的基本賠率，出現二個相同時，才算贏，贏的錢為下注的 3 倍
 List<int> pannelOdds = [3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3];
 
-///面板上重複圖片的額外的賠率 1   2  3   4  5  6  7   8   9 張相同圖片
+///面板上重複圖片的賠率       1  2   3   4  5  6  7  8   9 張相同圖片
 List<double> pannelPOdds = [0, 1, 1.5, 2, 3, 5, 8, 10, 20];
 
-///因下注而獲得的金額，儲存在這裡，與網路上圖片清單對應位置。
-///第一張圖片為第一注，中獎後儲存在第一個位置
+///因下注而獲得的金額，儲存在這裡
 List<int> priceMoney = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
 
-///１１１１１１１１１１１１１１１１１１１１１１１１１１１１１１１１１１１１１１１
-///１１１１１１１１１１１１１１１１１１１１１１１１１１１１１１１１１１１１１１１
+///==========================================
 ///
-///                           APP 上方面板宣告區
 ///
-///１１１１１１１１１１１１１１１１１１１１１１１１１１１１１１１１１１１１１１１
-///１１１１１１１１１１１１１１１１１１１１１１１１１１１１１１１１１１１１１１１
+///               上方面板佈件
+///
+///
+///=========================================
 class PlayTopPanel extends StatefulWidget {
+  final String uniqueId; // 用來生成唯一 Key 的值
+  //設定為 Global Key
+  //嘗試在程式執行在穩定的狀態下，看可不可以用這個方法
+  //如果 Widget 被捲動到看不到，在出現時才會改變
+  PlayTopPanel({
+    Key? key, //將父類別設定的 key 內容，設定給目前的 Widget --- 2
+    required this.uniqueId,
+  }) : super(key: ValueKey(uniqueId)); //設定繼承父類別的 key 值 --- 1
   @override
   State<PlayTopPanel> createState() => _playTopPannel();
 }
 
 class _playTopPannel extends State<PlayTopPanel> {
-  Timer? _timer1; //動態扣除金額
-  Timer? _timer2; //定時檢查中獎金額
+  Timer? _timer1;
+  Timer? _timer2;
 
-  /// Widget 被釋放前會執行的程序
   @override
   void dispose() {
     super.dispose();
@@ -65,7 +70,6 @@ class _playTopPannel extends State<PlayTopPanel> {
     _timer2?.cancel();
   }
 
-  /// initState() 後，可處理 Widget 初始化的程序
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -76,7 +80,6 @@ class _playTopPannel extends State<PlayTopPanel> {
     });
   }
 
-  ///將中獎金額加入到目前金額中
   void _updateTopPanelMoney() {
     _timer1 = Timer.periodic(
         Duration(milliseconds: 50),
@@ -90,13 +93,6 @@ class _playTopPannel extends State<PlayTopPanel> {
             }));
   }
 
-  ///★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
-  ///★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
-  ///
-  ///                        APP 上方面板物件配置
-  ///
-  ///★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
-  ///★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -179,13 +175,13 @@ class _playTopPannel extends State<PlayTopPanel> {
   }
 }
 
-///２２２２２２２２２２２２２２２２２２２２２２２２２２２２２２２２２２２
-///２２２２２２２２２２２２２２２２２２２２２２２２２２２２２２２２２２２
+///==========================================================
 ///
-///               APP 下方下注按鈕 控制面板　宣告區
 ///
-///２２２２２２２２２２２２２２２２２２２２２２２２２２２２２２２２２２２
-///２２２２２２２２２２２２２２２２２２２２２２２２２２２２２２２２２２２
+///         下方下注按鈕 控制面板
+///
+///
+///==========================================================
 class PlayButtonPanel extends StatefulWidget {
   ///用 Global Key 讓刷新圖片的 Widget 也刷新這個 Widget 狀態
   ///flutter 官方不建議使用  用不好  程式並不容易維護
@@ -234,13 +230,6 @@ class _PlayBottonPanelState extends State<PlayButtonPanel> {
     setState(() {});
   }
 
-  ///★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
-  ///★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
-  ///
-  ///                        APP 下方面板物件配置
-  ///
-  ///★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
-  ///★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
   @override
   Widget build(BuildContext context) {
     return SizedBox(
@@ -271,6 +260,10 @@ class _PlayBottonPanelState extends State<PlayButtonPanel> {
                             pannelMoney[0]++;
                             currentMoney--;
                           }
+
+                          ///下面為使用 Global Key 的方法，因為沒用所以註解掉
+                          // print(playTopPannel.currentState?.mounted);
+                          // playTopPannel.currentState?.setState(() {});
                         });
                       },
                       onLongPress: () {
@@ -607,24 +600,9 @@ class _PlayBottonPanelState extends State<PlayButtonPanel> {
 ///增加金額程序與變數
 ///================================================================以上
 
-///ＭａｉｎＭａｉｎＭａｉｎＭａｉｎＭａｉｎＭａｉｎＭａｉｎＭａｉｎＭａｉｎＭａｉｎ
-///ＭａｉｎＭａｉｎＭａｉｎＭａｉｎＭａｉｎＭａｉｎＭａｉｎＭａｉｎＭａｉｎＭａｉｎ
-///
-///　　　　　　　   　　　　　main()　程式進入點
-///
-///ＭａｉｎＭａｉｎＭａｉｎＭａｉｎＭａｉｎＭａｉｎＭａｉｎＭａｉｎＭａｉｎＭａｉｎ
-///ＭａｉｎＭａｉｎＭａｉｎＭａｉｎＭａｉｎＭａｉｎＭａｉｎＭａｉｎＭａｉｎＭａｉｎ
 void main() {
   runApp(MyApp());
 }
-
-///ＲｏｏｔＲｏｏｔＲｏｏｔＲｏｏｔＲｏｏｔＲｏｏｔＲｏｏｔＲｏｏｔＲｏｏｔＲｏｏｔ
-///ＲｏｏｔＲｏｏｔＲｏｏｔＲｏｏｔＲｏｏｔＲｏｏｔＲｏｏｔＲｏｏｔＲｏｏｔＲｏｏｔ
-///
-///　　　　　    　　   　　　App 根容器宣告區
-///
-///ＲｏｏｔＲｏｏｔＲｏｏｔＲｏｏｔＲｏｏｔＲｏｏｔＲｏｏｔＲｏｏｔＲｏｏｔＲｏｏｔ
-///ＲｏｏｔＲｏｏｔＲｏｏｔＲｏｏｔＲｏｏｔＲｏｏｔＲｏｏｔＲｏｏｔＲｏｏｔＲｏｏｔ
 
 class MyApp extends StatefulWidget {
   const MyApp({super.key});
@@ -645,7 +623,9 @@ class _MyAppState extends State<MyApp> {
         ///必須要用 SizeBox 限制大小，沒限制會出現錯誤
         body: ListView(
           children: [
-            PlayTopPanel(),
+            PlayTopPanel(
+              uniqueId: 'myPlayTopPanel',
+            ),
             SizedBox(
               height: 400,
               // width: 400,
@@ -664,7 +644,7 @@ class _MyAppState extends State<MyApp> {
 ///=====================================================================
 ///=====================================================================
 ///
-///                   APP 中間水果盤的宣告區
+/// 水果盤的主要 Widget
 ///
 ///=====================================================================
 ///=====================================================================
@@ -676,8 +656,9 @@ class ImageSwitcher extends StatefulWidget {
 }
 
 class _ImageSwitcherState extends State<ImageSwitcher> {
-  ///圖片下載進度條
-  double downloadProgress = 0.0;
+  //Global Key PlayButtonPanel
+  final GlobalKey<_PlayBottonPanelState> playButtonPanel =
+      GlobalKey<_PlayBottonPanelState>();
 
   ///可以改成圖片清單
   Image? _currentImg1;
@@ -731,16 +712,18 @@ class _ImageSwitcherState extends State<ImageSwitcher> {
     preloadImages(); //載入圖片
   }
 
-  ///按下水果盤的圖片或是按下按鈕，就會更換圖片
+  ///按下圖片或是按下按鈕，就會更換圖片
   Image _toggleImage({Image? Img}) {
     Random random = Random();
     int currentImageIndex = random.nextInt(_listImg.length);
 
     ///當亂數取回的 Key 與目前圖片相同，就在取一次亂數
-    ///避免圖片沒有變換
     while (Img!.key == _listImg[currentImageIndex].key) {
       currentImageIndex = random.nextInt(_listImg.length);
     }
+
+    // print(_listImg[currentImageIndex].key);
+
     return _listImg[currentImageIndex];
   }
 
@@ -785,6 +768,11 @@ class _ImageSwitcherState extends State<ImageSwitcher> {
       _currentImg7 = _listImg.first; //下載完成，顯示第一張圖片
       _currentImg8 = _listImg.first; //下載完成，顯示第一張圖片
       _currentImg9 = _listImg.first; //下載完成，顯示第一張圖片
+
+      ///用 Global Key 來要求執行另一個 Widget 的函數
+      ///因為 playButtonPanel.currentState 是 Null 所以沒效果
+      ///下次要增加狀態管理，來處理
+      playButtonPanel.currentState?.updateState();
     }); //載入資料後，用來刷新畫面
   }
 
@@ -815,7 +803,6 @@ class _ImageSwitcherState extends State<ImageSwitcher> {
   ///為了要縮短佈件排列的程序而宣告的部分
   ///
   void _touchImg({Image? touchImg, int? imgPosition}) {
-    ///根據不同的位置，將圖片設定給
     setState(() {
       switch (imgPosition) {
         case 1:
@@ -861,7 +848,10 @@ class _ImageSwitcherState extends State<ImageSwitcher> {
       ),
     );
   }
+  //為了要縮短佈件排列的程序而宣告的部分
+  //=============================================以上
 
+  ///======================以下
   ///畫出得分的線條
   void drawPriceLine() {
     List<Key?> fruitDish = [
@@ -891,6 +881,10 @@ class _ImageSwitcherState extends State<ImageSwitcher> {
     sLine[1] = (fruitDish[2] == fruitDish[4]) && (fruitDish[2] == fruitDish[6]);
   }
 
+  ///畫出得分的線條
+  ///======================以上
+
+  ///=======================以下
   ///計算中獎金額
   void computeMoney() {
     int showTimer = 0; //顯示次數
@@ -971,13 +965,9 @@ class _ImageSwitcherState extends State<ImageSwitcher> {
     }
   }
 
-  ///★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
-  ///★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
-  ///
-  ///                       APP 中間部分 水果盤物件配置
-  ///
-  ///★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
-  ///★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
+  ///計算中獎金額
+  ///=======================以下
+
   @override
   Widget build(BuildContext context) {
     // print(_listImg.length);
@@ -1283,6 +1273,17 @@ class _ImageSwitcherState extends State<ImageSwitcher> {
                       ),
                       ElevatedButton(
                         onPressed: () {
+                          // print(_currentImg1!.key);
+                          // print(_currentImg2!.key);
+                          // print(_currentImg3!.key);
+                          // print(_currentImg4!.key);
+                          // print(_currentImg5!.key);
+                          // print(_currentImg6!.key);
+                          // print(_currentImg7!.key);
+                          // print(_currentImg8!.key);
+                          // print(_currentImg9!.key);
+                          // setState(() {});
+
                           setState(() {
                             computeMoney(); //計算中獎金額
                             drawPriceLine(); //畫出線條
