@@ -1,156 +1,11 @@
-import 'package:flutter/material.dart';
-
 import 'dart:math'; // 使用 Random 時需呼叫
 
 import 'dart:async'; //要使用 Timer 要用這個
 
-import 'package:provider/provider.dart'; //使用ChangeNotifier 要用這個
+import 'package:provider/provider.dart';
 
-/// 完成下注按鈕 用 Wrap() 來排列，會自動換行
+import 'package:flutter/material.dart';
 
-///正在運轉的時候  不能滾動畫面
-
-// ///遊戲下注的面板
-class PlayPanel extends StatefulWidget {
-  @override
-  State<PlayPanel> createState() => _PlayPanelState();
-}
-
-class _PlayPanelState extends State<PlayPanel> {
-  @override
-  Widget build(BuildContext context) {
-    // TODO: implement build
-    throw UnimplementedError();
-  }
-}
-
-///下注面板，下注的單一按鈕，邏輯程序
-class betButton extends StatelessWidget {
-  final Image betImage; //顯示圖片
-  final int betMoney; //顯示金額
-  final bool betOpt; //背景控制
-  // final Function onPressed; //圖片按鈕按下觸發程序
-
-  const betButton({
-    required super.key,
-    required this.betImage,
-    required this.betMoney,
-    // required this.onPressed,
-    this.betOpt = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    var appState = context.watch<MyAppState>();
-
-    void addBetMoney() =>
-        appState.pressbetButton(betKey: this.key!, addMoney: 1);
-    void addBetBigMoney() =>
-        appState.pressbetButton(betKey: this.key!, addMoney: 10);
-
-    bool subPlayerMoney(money) => appState.subPlayerMoney(money: money);
-
-    return Container(
-      child: Container(
-        color: Colors.grey,
-        child: Column(
-          children: [
-            Text.rich(TextSpan(
-                style: TextStyle(
-                  color: Colors.limeAccent,
-                  fontSize: 36,
-                ),
-                children: [TextSpan(text: betMoney.toString())])),
-            IconButton(
-              onPressed: () {
-                int index = appState.getbetButtonKeyInt(betKey: this.key!);
-                print(' 取回按鈕的索引值 ${index}');
-                if (subPlayerMoney(1)) {
-                  ///如果能扣除金額，就增加金額
-                  addBetMoney();
-                }
-              },
-              icon: this.betImage,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-///下注面板，上方的金額顯示
-class MyMoney extends StatelessWidget {
-  final bool AniScal;
-  final String Title;
-  final int Money;
-  const MyMoney({
-    super.key,
-    required this.Money,
-    required this.Title,
-    this.AniScal = false, //沒有輸入 true 就當成 false
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    // return AnimatedSwitcher(
-    //   duration: const Duration(seconds: 2),
-    //   transitionBuilder: (Widget child, Animation<double> animation) {
-    //     return ScaleTransition(scale: animation, child: child);
-    //   },
-    //   child: Text(
-    //     '${Money}',
-    //     key: ValueKey<int>(Money),
-    //   ),
-    // );
-    return AnimatedSwitcher(
-      duration: Duration(
-        milliseconds: 400,
-      ),
-      transitionBuilder: (this.AniScal) //如果為真 就用改變大小的動畫
-          ? (Widget child, Animation<double> animation) {
-              return ScaleTransition(scale: animation, child: child);
-            }
-          : AnimatedSwitcher.defaultTransitionBuilder, //如果為假 就用預設透明的動畫
-      child: Row(
-        ///如果動畫不見，這邊的KEY一定有重複
-        ///或是Key沒有放在最外層
-        ///如果這的KEY 設定給這裡的 Text 也就是 Row 的內容子容器
-        ///就不會有動畫 !!
-        ///所以改在最外層  也就是 Row 才是 AnimatedSwitcher 的子
-        ///可能是因為  AnimatedSwitcher 會監測子容器 KEY 是否變化
-        ///然後才會產生動畫效果
-        key: ValueKey<String>(' ${this.Title}  ${this.Money}'),
-
-        children: [
-          Text.rich(
-            TextSpan(
-              children: [
-                TextSpan(
-                  text: '${this.Title} ', // Title 部分
-                  style: TextStyle(
-                    color: Colors.blue, // 設定 Title 的顏色
-                    fontSize: 24,
-                  ),
-                ),
-                TextSpan(
-                  text: '${this.Money}', // Money 部分
-                  style: TextStyle(
-                    color: Colors.red, // 設定 Money 的顏色
-                    fontSize: 24,
-                  ),
-                ),
-              ],
-            ),
-          )
-        ],
-      ),
-    );
-  }
-}
-
-///將 48 張圖片放到 PageView 中，這樣就可以最多捲動 47 次了
-///每一個小格子 都要放 48 張圖片  48 * 9 =  432
 class MyRunFruitsPageView extends StatelessWidget {
   final bool isVertical;
   final PageController imgPageCR;
@@ -176,8 +31,11 @@ class MyRunFruitsPageView extends StatelessWidget {
   }
 }
 
-///每一個小格子的動態效果，隨機效果都寫在這裡
 class PageViewImg extends StatefulWidget {
+  final GlobalKey<_PageViewImgState> _key = GlobalKey<_PageViewImgState>();
+
+  int get imgIndex => _key.currentState?.imgIndex ?? 0; // 獲取 imgIndex
+
   PageViewImg({required super.key});
 
   @override
@@ -185,26 +43,20 @@ class PageViewImg extends StatefulWidget {
 }
 
 class _PageViewImgState extends State<PageViewImg> {
-  int imgIndex = 0;
-  int? myPVindex;
+  int _imgIndex = 0;
 
-  Timer? timeRun; //設定自動執行程序的計時器
+  ///想要取回某一個位置，目前的圖片 KEY 整數代碼
+  int get imgIndex => _imgIndex; // 提供 imgIndex 的 getter
 
-  ///放在外部
-  PageController imgPageCR = PageController(initialPage: 0);
-
-  @override
-  void didUpdateWidget(covariant PageViewImg oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    print(' 更新 ${myPVindex}');
-  }
+  Timer? timeRun; //設定自動執行程序的ˋ計時器
+  ///PageView 用的控制器，這個控制器，不要放在 build 中，會造成第二次的執行時
+  ///程式會說你沒有設定給 PageView 所以不能控制
+  final imgPageCR = PageController(initialPage: 0);
 
   @override
   void dispose() {
     super.dispose();
-    print(' 移除 ${myPVindex}');
     timeRun?.cancel();
-    imgPageCR.dispose();
   }
 
   @override
@@ -213,12 +65,9 @@ class _PageViewImgState extends State<PageViewImg> {
     List<Image> fruitImg = appState._fruitImg; //取回設定的圖片
     List<int> fruitPositionImgKey = appState.fruitPositionImgKey;
     List<int> fruitPositionIsRunning = appState.fruitPositionIsRunning;
-    List<int> fruitPositionRandom = appState.fruitPositionRandom;
 
     ///取回這個 PageViewImg 的Key 索引值
     int thisWidgetIntKey = appState.getPVIKeyInt(widget.key);
-
-    myPVindex = thisWidgetIntKey;
 
     ///設定項目
     const int MaxRunning = 48; //跑動清單的圖片數量，最後一張為中獎圖片
@@ -226,12 +75,9 @@ class _PageViewImgState extends State<PageViewImg> {
 
     ///初始化設定
     Random random = Random();
-    // int imgIndex = 0;
-    imgIndex = (appState.isPlaying)
-        ? fruitPositionRandom[thisWidgetIntKey]
-        : random.nextInt(12); //產生 0 ~ 11 的整數亂數
 
-    fruitPositionRandom[thisWidgetIntKey] = imgIndex;
+    int imgIndex = 0;
+    imgIndex = random.nextInt(12); //產生 0 ~ 11 的整數亂數
 
     /// 產生數量為 MaxRunning 個圖片 Widget 清單
     /// myImg 代表這個 PageView 的圖片清單，每一個 PageView 各自獨立的清單
@@ -263,45 +109,33 @@ class _PageViewImgState extends State<PageViewImg> {
 
     ///更新圖片，將 PageView 設定為顯示第一張圖片，並且重新產生48張圖片清單
     void updateImgList() {
-      // 因為隱藏物件後   再出現一次   會自動回到第一頁
-      // imgPageCR.jumpToPage(0); //回到 PageView 第一頁
+      // ///重新設定  外部的設定就夠了  這裡不用再重複一次
+      // myRunFruitsPageView0 = MyRunFruitsPageView(
+      //   isVertical: isVertical,
+      //   myImg: myImg,
+      //   imgPageCR: imgPageCR,
+      //   maxRunning: MaxRunning,
+      // );
+      imgPageCR.jumpToPage(0); //回到 PageView 第一頁
 
-      // myImg.clear(); //清除照片
-
-      ///隨機取數值
-      // imgIndex = random.nextInt(12);
+      myImg.clear(); //清除照片
 
       ///刷新目前數量為 MaxRunning 圖片排列
-      ///隨機選取第一張圖片，就會固定決定最後一張照片
       myImg = List.generate(MaxRunning, (index) {
         int imgI = (imgIndex + index) % 12; //循環取圖片
         return fruitImg[imgI];
       });
     }
 
-    ///切換畫面 會發生錯誤  xxxx
     void onTap() {
-      ///如果這個 Widget 已經被安裝
-      // if (mounted) {
-
-      ///setState() 會因為物件被隱藏在後方 就會將該狀態移除....
-      ///雖然重新出現後  直接點擊物件  可以觸發它的功能
-      ///但無法用  定時的方式  觸發程序....
-      ///無解  所以改用別的方法
-      ///不用 setState()  PageView 物件 依然可以自動捲動  MaxRunning
-
-      updateImgList();
-      if (imgPageCR.page!.round() > 0) {
-        imgPageCR.jumpTo(0);
-      }
-
-      ///同時用二個  animateToPage 只有一次效果
-      imgPageCR.animateToPage((36 + random.nextInt(12)), //MaxRunning = 48
+      setState(() {
+        updateImgList();
+      });
+      imgPageCR.animateToPage(MaxRunning - 1,
           duration: Duration(seconds: appState.runningMaxTimeSecond), //動畫速度
 
           ///這個變化曲線，慢曼加速 中間高速 慢慢減速停止，符合遊戲感覺
           curve: Curves.easeInOutCubic);
-      // }
     }
 
     ////定時檢查設定
@@ -325,13 +159,7 @@ class _PageViewImgState extends State<PageViewImg> {
   }
 }
 
-///完整的 九宮格水果盤物件 在這裡整合
-class MyNineFruitDish extends StatefulWidget {
-  @override
-  State<MyNineFruitDish> createState() => _MyNineFruitDishState();
-}
-
-class _MyNineFruitDishState extends State<MyNineFruitDish> {
+class MyNineFruitDish extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     var appState = context.watch<MyAppState>();
@@ -345,47 +173,17 @@ class _MyNineFruitDishState extends State<MyNineFruitDish> {
     Timer? timePlayGame;
 
     void ReadGameState() => appState.ReadGameState();
-    void MyPlayGame() => appState.PlayGame();
-    void MyClearLine() => appState.clearLine();
-    void calculateBonus() => appState.calculateBonus();
 
-    void testPlay() {
-      setState(() {
-        ReadGameState();
-      });
-    }
-
-    ///按下開始遊戲
     void PlayGame() {
-      ///清除先前畫的線
-      setState(() {
-        MyClearLine();
-      });
-
-      ///設定目前正在遊戲記號
       isPlaying = true;
+      appState.PlayGame();
 
-      ///設定單一水果盤運轉記號，讓水果盤跑起來
-      MyPlayGame();
-
-      ///設定計時器，計時器延遲  設定運轉時間 + 1 秒，並且會自己關閉自己
       timePlayGame = Timer.periodic(
           Duration(seconds: appState.runningMaxTimeSecond + 1), (time) {
         if (isPlaying) {
-          ///讀取遊戲執行完的結果
           ReadGameState();
-
-          ///設定為遊戲停止的狀態
           isPlaying = false;
-
-          ///計算獎勵
-          calculateBonus();
-
-          ///關閉計時器
           timePlayGame?.cancel();
-
-          ///刷新目前 Widget 狀態
-          setState(() {});
         }
         // print('test189'); //在外部宣告計時器後，就可以自己關閉自己了
       });
@@ -684,7 +482,7 @@ class _MyNineFruitDishState extends State<MyNineFruitDish> {
             Row(
               children: [
                 ElevatedButton(
-                  onPressed: () => testPlay(),
+                  onPressed: () => ReadGameState(),
                   child: Text('讀取遊戲狀態'),
                 ),
                 ElevatedButton(
@@ -702,145 +500,13 @@ class _MyNineFruitDishState extends State<MyNineFruitDish> {
 
 ///管理 APP 與使用者的互動狀態，互動時有些 Wigdets 需要有變化，都靠這裡處理
 class MyAppState extends ChangeNotifier {
-  int? palyerMoney; //保存目前玩家金額，主要用來扣除下注金額
-  int? BonusMoney; //保存中獎金額
-
-  bool subPlayerMoney({int money = 1}) {
-    ///如果目前金額可以扣除
-    if ((palyerMoney! - money) > 0) {
-      palyerMoney = palyerMoney! - money;
-      return true; //就扣除金額
-    }
-
-    print(palyerMoney);
-
-    return false; //沒辦法扣除金額
-  }
-
-  ///下注金額清單
-  List<int> betMoney = List.filled(12, 0, growable: false);
-
-  ///計算每個圖片出現的次數清單
-  List<int> betImageCounter = List.filled(12, 0, growable: false);
-
-  ///計算後的中獎金額清單
-  List<int> betBonus = List.filled(12, 0, growable: false);
-
-  ///面板上的基本賠率，出現二個相同時，才算贏，贏的錢為下注的 3 倍，與網路上圖片清單對應位置。
-  List<int> pannelOdds = [3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3];
-
-  ///面板上重複圖片的額外的賠率 1   2  3   4  5  6  7   8   9 張相同圖片
-  List<double> pannelPOdds = [0, 1, 1.5, 2, 3, 5, 8, 10, 20];
-
-  ///清除中獎次數，這樣才能重新計數，新一輪的開始
-  void clearBetImageCounter() {
-    for (int index = 0; index < betImageCounter.length; index++) {
-      betImageCounter[index] = 0;
-    }
-  }
-
-  ///根據下注金額清單，計算中獎獎金清單金額
-  void calculateBonus() {
-    for (int index = 0; index < betImageCounter.length; index++) {
-      print(' ${index + 51}  ${betImageCounter[index]}');
-
-      int showTimer = betImageCounter[index];
-
-      ///計算中獎金額，並將金額儲存到 priceMoney 中
-      betBonus[index] = (showTimer < 2) //沒中獎，只有出現一次
-          ? 0
-          : (showTimer < 3) //中獎，出現 2 次
-              ? (pannelOdds[index] * pannelMoney[index] * pannelPOdds[1])
-                  .toInt()
-              : (showTimer < 4) //中獎，出現 3 次
-                  ? (pannelOdds[index] * pannelMoney[index] * pannelPOdds[2])
-                      .toInt()
-                  : (showTimer < 5) //中獎，出現 4 次
-                      ? (pannelOdds[index] *
-                              pannelMoney[index] *
-                              pannelPOdds[3])
-                          .toInt()
-                      : (showTimer < 6) //中獎，出現 5 次
-                          ? (pannelOdds[index] *
-                                  pannelMoney[index] *
-                                  pannelPOdds[4])
-                              .toInt()
-                          : (showTimer < 7) //中獎，出現 6 次
-                              ? (pannelOdds[index] *
-                                      pannelMoney[index] *
-                                      pannelPOdds[5])
-                                  .toInt()
-                              : (showTimer < 8) //中獎，出現 7 次
-                                  ? (pannelOdds[index] *
-                                          pannelMoney[index] *
-                                          pannelPOdds[6])
-                                      .toInt()
-                                  : (showTimer < 9) //中獎，出現 8 次，
-                                      ? (pannelOdds[index] *
-                                              pannelMoney[index] *
-                                              pannelPOdds[7])
-                                          .toInt()
-                                      //中獎，出現九次
-                                      : (pannelOdds[index] *
-                                              pannelMoney[index] *
-                                              pannelPOdds[8])
-                                          .toInt();
-    }
-  }
-
-  // List<betButton> betButtonEntity = []; //從頁面傳回物件的實體
-  List<Widget> betButtonEntity = []; //從頁面傳回物件的實體
-
-  int getbetButtonKeyInt({required Key betKey}) {
-    for (int index = 0; index < betButtonEntity.length; index++) {
-      if (betButtonEntity[index].key == betKey) {
-        return index;
-      }
-    }
-    return 99; //找不到 Key 傳回數值
-  }
-
-  ///執行後按下按鈕的下注金額加 上 輸入參數
-  void pressbetButton({
-    required Key betKey,
-    required int addMoney,
-  }) {
-    for (int index = 0; index < betButtonEntity.length; index++) {
-      if (betButtonEntity[index].key == betKey) {
-        betMoney[index] += addMoney;
-      }
-    }
-    notifyListeners(); //從狀態管理這，觸發刷新畫面
-  }
-
-  ///下注金額，對應圖片位置
-  List<int> betfruitPos = List.filled(12, 0, growable: false);
-
   ///預設水果盤狀態，全都設定為 0
   List<int> fruitPositionImgKey = List.generate(9, (index) {
     return 0;
   });
 
-  ///水果盤亂數狀態，全都設定為 0
-  List<int> fruitPositionRandom = List.generate(9, (index) {
-    return 0;
-  });
-
   bool isGameRunning = true;
 
-  void clearLine() {
-    vLine[0] = false;
-    vLine[1] = false;
-    vLine[2] = false;
-    hLine[0] = false;
-    hLine[1] = false;
-    hLine[2] = false;
-    sLine[0] = false;
-    sLine[1] = false;
-  }
-
-  ///讀取狀態，並且設定那些線條，要被顯示出來
-  ///設定圖片出現次數
   void ReadGameState() {
     print(
         '  ${fruitPositionImgKey[0]}   ${fruitPositionImgKey[1]}   ${fruitPositionImgKey[2]}  ');
@@ -848,43 +514,6 @@ class MyAppState extends ChangeNotifier {
         '  ${fruitPositionImgKey[3]}   ${fruitPositionImgKey[4]}   ${fruitPositionImgKey[5]}  ');
     print(
         '  ${fruitPositionImgKey[6]}   ${fruitPositionImgKey[7]}   ${fruitPositionImgKey[8]}  ');
-
-    ///設定圖片 Key 的整數數值
-    List<int> imgIntKey = List.generate(12, (index) {
-      return 51 + index;
-    });
-
-    ///清除先前圖片出現次數的計算結果
-    clearBetImageCounter();
-
-    ///計算圖片出現次數
-    for (int index = 0; index < fruitPositionImgKey.length; index++) {
-      if (imgIntKey[0] == fruitPositionImgKey[index]) {
-        betImageCounter[0]++;
-      } else if (imgIntKey[1] == fruitPositionImgKey[index]) {
-        betImageCounter[1]++;
-      } else if (imgIntKey[2] == fruitPositionImgKey[index]) {
-        betImageCounter[2]++;
-      } else if (imgIntKey[3] == fruitPositionImgKey[index]) {
-        betImageCounter[3]++;
-      } else if (imgIntKey[4] == fruitPositionImgKey[index]) {
-        betImageCounter[4]++;
-      } else if (imgIntKey[5] == fruitPositionImgKey[index]) {
-        betImageCounter[5]++;
-      } else if (imgIntKey[6] == fruitPositionImgKey[index]) {
-        betImageCounter[6]++;
-      } else if (imgIntKey[7] == fruitPositionImgKey[index]) {
-        betImageCounter[7]++;
-      } else if (imgIntKey[8] == fruitPositionImgKey[index]) {
-        betImageCounter[8]++;
-      } else if (imgIntKey[9] == fruitPositionImgKey[index]) {
-        betImageCounter[9]++;
-      } else if (imgIntKey[10] == fruitPositionImgKey[index]) {
-        betImageCounter[10]++;
-      } else if (imgIntKey[11] == fruitPositionImgKey[index]) {
-        betImageCounter[11]++;
-      }
-    }
 
     ///水平線設定
     hLine[0] = (fruitPositionImgKey[0] == fruitPositionImgKey[1]) &&
@@ -903,9 +532,9 @@ class MyAppState extends ChangeNotifier {
         (fruitPositionImgKey[2] == fruitPositionImgKey[8]);
 
     ///斜線設定
-    sLine[1] = (fruitPositionImgKey[0] == fruitPositionImgKey[4]) &&
+    sLine[0] = (fruitPositionImgKey[0] == fruitPositionImgKey[4]) &&
         (fruitPositionImgKey[0] == fruitPositionImgKey[8]);
-    sLine[0] = (fruitPositionImgKey[2] == fruitPositionImgKey[4]) &&
+    sLine[1] = (fruitPositionImgKey[2] == fruitPositionImgKey[4]) &&
         (fruitPositionImgKey[2] == fruitPositionImgKey[6]);
   }
 
@@ -980,7 +609,6 @@ class MyAppState extends ChangeNotifier {
     });
   }
 
-  ///取回PageView  Key 的對應 int 數值
   int getPVIKeyInt(Key? key) {
     if (listPageView[0].key == key) {
       return 0;
@@ -1157,209 +785,10 @@ class MyAppState extends ChangeNotifier {
   ];
 }
 
-class MyHomePage extends StatefulWidget {
-  @override
-  State<MyHomePage> createState() => _MyHomePageState();
-}
-
-class _MyHomePageState extends State<MyHomePage> {
-  int palyerMoney = 0; //初始化玩家目前金額
-  int BonusMoney = 0; //初始化中獎金額
-
-  ///PageView 用的控制器
-  final homePageViewCR = PageController(initialPage: 0);
-
-  PageStorageBucket bucket1 = PageStorageBucket();
-  PageStorageBucket bucket2 = PageStorageBucket();
-  PageStorageBucket bucket3 = PageStorageBucket();
-
-  Timer? _timerMyHomePageState;
-  Timer? _timerPage2;
-
-  @override
-  void initState() {
-    super.initState();
-    homePageViewCR.addListener(() {
-      // 當頁面改變時，這裡會被調用
-      print("當前頁面: ${homePageViewCR.page}} ");
-    });
-  }
-
-  @override
-  void dispose() {
-    super.dispose();
-    homePageViewCR.dispose();
-    _timerMyHomePageState?.cancel();
-    _timerPage2?.cancel();
-  }
-
+class MyHomePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    var appState = context.watch<MyAppState>();
-    List<int> betMoney = appState.betMoney; //取回下注金額
-    List<Image> fruitImg = appState._fruitImg; //取回設定的圖片
-    List<betButton> betButtonEntity = List<betButton>.generate(12, (index) {
-      return betButton(
-        key: ValueKey<String>('betButton${index + 1}'),
-        betImage: fruitImg[index],
-        betMoney: betMoney[index],
-      );
-    });
-
-    appState.betButtonEntity = betButtonEntity;
-
-    MyNineFruitDish myNineFD = MyNineFruitDish();
-
-    ///狀態的金額與本地的金額  校正
-    void _updateStateMoney() {
-      ///AppState 金額小於 HomePage
-      ///有按下  下注按鈕
-      if (!(appState.palyerMoney is Null)) {
-        if (appState.palyerMoney! < this.palyerMoney) {
-          this.palyerMoney = appState.palyerMoney!;
-        }
-      }
-    }
-
-    ///更新金額到目前金額
-    void _updateMoney() {
-      if (BonusMoney > 0) {
-        if (BonusMoney + palyerMoney >= 999999) {
-          setState(() {
-            BonusMoney = 0;
-            palyerMoney = 999999;
-          });
-        } else if (BonusMoney > 10000) {
-          setState(() {
-            BonusMoney -= 10000;
-            palyerMoney += 10000;
-          });
-        } else if (BonusMoney > 1000) {
-          setState(() {
-            BonusMoney -= 1000;
-            palyerMoney += 1000;
-          });
-        } else if (BonusMoney > 100) {
-          setState(() {
-            BonusMoney -= 100;
-            palyerMoney += 100;
-          });
-        } else if (BonusMoney > 10) {
-          setState(() {
-            BonusMoney -= 10;
-            palyerMoney += 10;
-          });
-        } else {
-          setState(() {
-            BonusMoney--;
-            palyerMoney++;
-          });
-        }
-      }
-      appState.BonusMoney = BonusMoney;
-      appState.palyerMoney = palyerMoney;
-      setState(() {});
-    }
-
-    ///先關閉，再開啟
-    _timerMyHomePageState?.cancel();
-    _timerMyHomePageState = Timer.periodic(Duration(seconds: 2), (time) {
-      if (homePageViewCR.page?.round() == 1) {
-        print('timerMyHome');
-        _timerPage2?.cancel();
-        _timerPage2 = Timer.periodic(Duration(milliseconds: 200), (time) {
-          _updateStateMoney();
-          _updateMoney();
-        });
-
-        _timerMyHomePageState?.cancel();
-      }
-    });
-
-    ///ＭＹＨＯＭＥ　ＰＡＧＥ　ＭＹＨＯＭＥ　ＰＡＧＥ　ＭＹＨＯＭＥ　ＰＡＧＥ　ＭＹＨＯＭＥ　ＰＡＧＥ
-    ///
-    ///
-    ///                                        主程式頁面
-    ///
-    ///
-    ///ＭＹＨＯＭＥ　ＰＡＧＥ　ＭＹＨＯＭＥ　ＰＡＧＥ　ＭＹＨＯＭＥ　ＰＡＧＥ　ＭＹＨＯＭＥ　ＰＡＧＥ
-    return PageView(
-        controller: homePageViewCR,
-        scrollDirection: Axis.horizontal,
-        children: [
-          /// 第一頁
-          PageStorage(bucket: bucket1, child: myNineFD),
-
-          /// 第二頁
-          PageStorage(
-            bucket: bucket2,
-            child: Scaffold(
-              appBar: AppBar(
-                title: Text('下注畫面'),
-              ),
-              body: LayoutBuilder(builder: (BuildContext context, constraints) {
-                return Stack(
-                  children: [
-                    Column(
-                      children: [
-                        SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                            children: [
-                              SizedBox(
-                                  width: constraints.maxWidth / 2,
-                                  child: MyMoney(
-                                      Title: '中獎獎金', Money: BonusMoney)),
-                              SizedBox(
-                                  width: constraints.maxWidth / 2,
-                                  child: MyMoney(
-                                      Title: '目前金額', Money: palyerMoney)),
-                            ],
-                          ),
-                        ),
-                        ElevatedButton(
-                            onPressed: () {
-                              print(
-                                  '${homePageViewCR.page?.round()}'); //列印出目前葉面索引值
-                              // _updateMoney();
-                              ///自動將金額載入目前金額
-                            },
-                            child: Text('測試')),
-                        ElevatedButton(
-                          onPressed: () {
-                            setState(() {
-                              BonusMoney += 9999;
-
-                              print(' ${BonusMoney}');
-                            });
-                          },
-                          child: Text('增加中獎金額'),
-                        ),
-                        Wrap(
-                          direction: Axis.horizontal,
-                          spacing: 4.0, // gap between adjacent chips
-                          runSpacing: 4.0, // gap between lines
-                          children: [
-                            for (int index = 0; index < 12; index++)
-                              GestureDetector(
-                                  onTap: () {
-                                    print('GestureDetector${index}');
-                                  },
-                                  child: betButtonEntity[index]),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ],
-                );
-              }),
-            ),
-          ),
-
-          ///第三頁
-          PageStorage(bucket: bucket3, child: Text('遊戲後台')),
-        ]);
+    return MyNineFruitDish();
   }
 }
 
